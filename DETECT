@@ -1,0 +1,552 @@
+#!/usr/bin/env perl
+
+#    DETECT - Pipeline for assay design evaluation.
+#
+#    Copyright (C) 2016-2018 LANL
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use strict;
+use warnings;
+use Scalar::Util qw(openhandle);
+use Time::Piece;
+use File::Basename;
+use Getopt::Long;
+use Cwd;
+use FindBin qw($RealScript $RealBin);
+use lib "$RealBin/ext/lib/perl5";
+#use Data::Dumper;
+use Parallel::ForkManager;
+
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# add our included binaries to the PATH
+
+$ENV{PATH} = "$RealBin/ext/miniconda/bin:$ENV{PATH}";
+$ENV{R_LIBS}=($ENV{R_LIBS})? "$RealBin/ext/lib/R_libs:$ENV{R_LIBS}":"$RealBin/ext/lib/R_libs";
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# global variables
+
+my $VERSION='0.2.0';
+my $AUTHOR='Chienchi Lo <chienchi@lanl.gov>';
+my $OPSYS = $^O;
+my $EXE = $FindBin::RealScript;
+my $URL = 'https://github.com/LANL-Bioinformatics/DETECT';
+
+
+my $quality_calculation_cutoff=0.95**4;
+my $depth_cutoff=1000; 
+my $expect_best_qual=37;
+my $expect_bwa_MapQ=60;
+my $expectedCoverage=1;
+my $expectedIdentity=1;
+my $mode="PE";
+my $align_options="";
+my ($coverageWeight, $identityWeight, $baseqWeight, $mapqWeight) = (0.25, 0.25, 0.25, 0.25);
+my $read_length_cutoff=100;
+my $cpus=4;
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# command line options
+my ($outdir,$indir,$sample_desc_file,$ref_file, $prefix,
+$quiet,$debug,$force);
+GetOptions(
+            "outdir=s"         => \$outdir,
+            "cpus=i"           => \$cpus,
+            "ref=s"            => \$ref_file,
+            "samples=s"        => \$sample_desc_file,
+            "indir=s"          => \$indir,
+            "prefix=s"         => \$prefix,
+            "q_cutoff=f"       => \$quality_calculation_cutoff,
+            "depth_cutoff=i"   => \$depth_cutoff,
+            "mode=s"           => \$mode,
+            "expectedCoverage=f" => \$expectedCoverage,
+            "expectedIdentity=f" => \$expectedIdentity,
+            "expectedBaseQ=i"  => \$expect_best_qual,
+            "expectedMapQ=i"   => \$expect_bwa_MapQ,
+            "coverageWeight=f" => \$coverageWeight,
+            "identityWeight=f" => \$identityWeight,
+            "baseqWeight=f"    => \$baseqWeight,
+            "mapqWeight=f"     => \$mapqWeight,
+            "len_cutoff=i"     => \$read_length_cutoff,
+            "align_options=s"   => \$align_options,
+            "quite"            => \$quiet,
+            "debug"            => \$debug,
+            "force"            => \$force,
+            "version"          => sub{print "Version $VERSION\n";exit;},
+            "help|?"           => sub{usage()} );
+
+
+my $starttime = localtime;
+
+$sample_desc_file ||= $ARGV[0];
+(!$sample_desc_file && !$ref_file && !$indir) && (usage());
+unless ($sample_desc_file && -e $sample_desc_file) {err("Not found sample description file")};
+unless ($ref_file && -e $ref_file){err("Not found reference FASTA file")};
+unless ($indir && -d $indir){err("Not found input directory")};
+if ( $expectedCoverage<=0 or $expectedCoverage>1) {err("Expected coverage must be a number > 0 and <=1 !");}
+if ( $expectedIdentity<=0 or $expectedIdentity>1) {err("Expected identity must be a number > 0 and <=1 !");}
+if ( $coverageWeight<0 or $coverageWeight>1) {err("Coverage weight must be a number between 0 and 1!");}
+if ( $identityWeight<0 or $identityWeight>1) {err("Identity weight must be a number between 0 and 1!");}
+if ( $baseqWeight<0 or $baseqWeight>1) {err("BaseQ weight must be a number between 0 and 1!");}
+if ( $mapqWeight<0 or $mapqWeight>1) {err("MapQ weight must be a number between 0 and 1!");}
+if ( $mapqWeight + $baseqWeight + $identityWeight + $coverageWeight != 1){err("The sum of Weight metrics should be equal to 1");}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# welcome message
+msg("This is $EXE $VERSION");
+msg("Written by $AUTHOR");
+msg("Local time is $starttime");
+msg("You are", $ENV{USER} || 'not telling me who you are!');
+msg("Operating system is $OPSYS");
+msg("You have enabled DEBUG mode. Temporary files will NOT be deleted.") if $debug;
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# check output directory
+$prefix ||= $EXE.'_'.(localtime->mdy(''));
+$outdir ||= $prefix;
+my $abs_outDir=Cwd::abs_path("$outdir");
+if (-d $outdir) {
+	if ($force) { 
+		msg("Re-using existing --outdir $outdir")
+	}else {
+		err("Folder '$outdir' already exists! Please change --outdir or use --force");
+	}
+}else {    
+	msg("Creating new output folder: $outdir");
+	runcmd("mkdir -p \Q$outdir\E");
+}
+msg("Using filename prefix: $prefix.XXX");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# set up log file
+my $logfile = "$outdir/$prefix.log";
+msg("Writing log to: $logfile");
+open LOG, '>', $logfile or err("Can't open logfile");
+
+my $CMDLINE = qx/ps -o args $$/;
+$CMDLINE =~ s/ARGS\n//;
+chomp $CMDLINE;
+msg("Command: $CMDLINE");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# Determine CPU cores available
+my $num_cores = num_cpu();
+msg("System has $num_cores cores.");
+
+if (!defined $cpus or $cpus < 0) {
+  $cpus = 1;
+}
+elsif ($cpus == 0) {
+  $cpus = $num_cores;
+}
+elsif ($cpus > $num_cores) {
+  msg("Option --cpu asked for $cpus cores, but system only has $num_cores");
+  $cpus = $num_cores;
+}
+msg("Will use maximum of $cpus cores.");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# now check the tools 
+check_tools();
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# check reference file and read in sample description file;
+msg("Sample Description File: $sample_desc_file");
+msg("Sample Directory: $indir");
+my $samples_r=&parse_description_files($indir,$sample_desc_file);
+if (! is_fasta($ref_file)){
+	err("The reference file is not in FASTA format");
+}
+my $num_sample= scalar(keys %{$samples_r});
+msg("Number of Samples: $num_sample");
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# check reference file index
+msg("Reference: $ref_file");
+if(! -e "$ref_file.bwt")
+{
+	msg("BWA index $ref_file"); 
+	runcmd("bwa index $ref_file 2>$ref_file.index.log");
+	runcmd("samtools faidx $ref_file 2>>$ref_file.index.log");
+	err("BWA index failed") if (! -e "$ref_file.bwt");
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# mapping sample reads
+msg("BWA mapping reads to reference"); 
+runcmd("mkdir -p  $outdir/mapping");
+foreach my $sample(keys %{$samples_r}){
+	next if ( -e "$outdir/mapping/$sample.mapping.log" && -s "$outdir/mapping/$sample.bam" );
+	my $mapping_log = "$outdir/mapping/$sample.mapping.log";
+	my @files = @{$samples_r->{$sample}->{files}};
+	my $paired_files = join(" ",@files);
+	my $desc = ($samples_r->{$sample}->{Descriptions})?$samples_r->{$sample}->{Descriptions}:"TARGET_SEQUENCING";
+	my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:ILLUMINA";
+	my $other_options = ($mode eq "SE")? "-S -P" : "" ;
+	$other_options .= " $align_options " if ($align_options);
+	runcmd("bwa mem $other_options -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# gather mapping statistics
+msg("Gather mapping statistics"); 
+unlink "$outdir/stats/$prefix.mapping_stats.txt";
+runcmd("mkdir -p  $outdir/stats");
+my $pm = new Parallel::ForkManager($cpus);
+my @samples = keys %{$samples_r};
+foreach my $sample_i( 0..$#samples ){
+	my $sample = $samples[$sample_i];
+	unless (-e "$outdir/stats/$sample.mapping_stats.txt" ){
+		$pm->start($sample) and next;
+		my $options = "--q_cutoff $quality_calculation_cutoff --depth_cutoff $depth_cutoff ";
+		$options .= "--mode $mode " if ($mode ne "PE");
+		$options .= "--expectedCoverage $expectedCoverage " if ($expectedCoverage != 1);
+		$options .= "--expectedIdentity $expectedIdentity " if ($expectedIdentity != 1);
+		$options .= "--expectedBaseQ $expect_best_qual " if ($expect_best_qual != 37);
+		$options .= "--expectedMapQ $expect_bwa_MapQ " if ($expect_bwa_MapQ != 60);
+		$options .= "--coverageWeight $coverageWeight " if ($coverageWeight != 0.25);
+		$options .= "--identityWeight $identityWeight " if ($identityWeight != 0.25);
+		$options .= "--baseqWeight $baseqWeight " if ($baseqWeight != 0.25);
+		$options .= "--mapqWeight $mapqWeight " if ($mapqWeight != 0.25);
+		$options .= "--len_cutoff $read_length_cutoff " if ($read_length_cutoff !=100);
+		
+		runcmd("$RealBin/get_stats_from_sort_bam.pl $options -o $outdir/stats -ref $ref_file $outdir/mapping/$sample.bam");
+		$pm->finish(0);
+	}
+}
+$pm->wait_all_children;
+
+foreach my $sample_i( 0..$#samples ){
+    my $sample = $samples[$sample_i];
+	if ($sample_i<1) {
+		runcmd("cat $outdir/stats/$sample.mapping_stats.txt >  $outdir/stats/$prefix.mapping_stats.txt");
+	#	runcmd("cat $outdir/stats/$sample.report.txt >  $outdir/stats/$prefix.report.txt");
+		runcmd("cat $outdir/stats/$sample.run_stats.txt >  $outdir/stats/$prefix.run_stats.txt");
+	}else{
+		`grep -v \'SampleID\' $outdir/stats/$sample.mapping_stats.txt >>  $outdir/stats/$prefix.mapping_stats.txt || true`;
+	#	`grep -v \'SampleID\' $outdir/stats/$sample.report.txt >>  $outdir/stats/$prefix.report.txt || true`;
+		`grep -v \'SampleID\' $outdir/stats/$sample.run_stats.txt >>  $outdir/stats/$prefix.run_stats.txt || true` ;
+	}
+}
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# create sample plots
+msg("Generate report plots"); 
+runcmd("mkdir -p  $outdir/reports");
+my $plot_log = "$outdir/reports/log.txt";
+runcmd("Rscript $RealBin/DETECT_plot.R $outdir/stats/$prefix.mapping_stats.txt  $outdir/stats/$prefix.run_stats.txt $abs_outDir/reports/$prefix $quality_calculation_cutoff $depth_cutoff 2>$plot_log");
+
+my $num_of_postive=`grep -i 'Positive' $outdir/stats/$prefix.report.txt | wc -l`;
+my $num_of_postive_sample=`grep -i 'Positive' $outdir/stats/$prefix.report.txt | awk '{print \$1}' | sort | uniq | wc -l`;
+my $num_of_postive_target=`grep -i 'Positive' $outdir/stats/$prefix.report.txt | awk '{print \$2}' | sort | uniq | wc -l`;
+chomp $num_of_postive;
+chomp $num_of_postive_sample;
+chomp $num_of_postive_target;
+msg("$num_of_postive_target Targeted Amplicons were found Positive from $num_of_postive_sample Samples");
+
+# . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
+# Some final log output
+my $endtime = localtime;
+my $walltime = $endtime - $starttime;
+
+my $pretty = sprintf "%.2f minutes", $walltime->minutes;
+msg("Walltime used: $pretty");
+#EXIT
+
+
+sub parse_description_files {
+	my $dir=shift;
+	my $desc_files=shift;
+	my @pe_files;
+	my @se_files;
+	my $samples;
+    
+	my ($file_column_index,@header);
+	my $fh;
+	if ($desc_files =~ /xlsx$/){
+		open ($fh, "xlsx2csv -d tab $desc_files | ") or die "Cannot read $desc_files\n";
+	}else{
+		open ($fh, $desc_files) or err("Cannot read $desc_files");
+	}
+	while(<$fh>){
+		chomp;
+		next if (/^\n/);
+		next unless (/\S/);
+		if (/SampleID/i){
+			@header = split /\t/,$_;
+			( $file_column_index )= grep { $header[$_] =~ /Files/i } 0..$#header;
+		}elsif(! /^#/){
+			my @array = split /\t/,$_;
+			$array[0] =~ s/\W/\_/g;
+			foreach my $i(1..$#array){
+				if ($i == $file_column_index){
+               				my @fastq_files;
+               				foreach my $file_name (split /,|\s+/,$array[$i]){
+						$file_name =~ tr/"//d;
+               					my $fastq_file = "$dir/$file_name";
+               					if (! -e $fastq_file ){
+               						err("Not found '$file_name' in $dir.");
+               					}elsif (! is_fastq($fastq_file)){
+               						err("'$file_name' is not in FASTQ format.");
+               					}
+               					push @fastq_files , $fastq_file;
+               				}
+               		
+            				if (scalar(@fastq_files)%2 and $mode eq "PE"){
+               					err("Sample '$array[0]' is not paired-end.");
+               				}
+               				@{ $samples->{$array[0]}->{files}} = @fastq_files;
+               			}else{
+               				$samples->{$array[0]}->{$header[$i]}=$array[$i];
+               			}
+        		} 
+        	}
+	}
+	close $fh;
+	if (!@header || !$file_column_index){
+		err("The sample description doesn't have correct header. (SampleID\tFiles)");
+	}
+    
+	return ($samples);
+}
+
+sub msg {
+	my $t = localtime;
+	my $line = "[".$t->hms."] @_\n";
+	print LOG $line if openhandle(\*LOG);
+	print STDERR $line unless $quiet;
+}
+
+sub err {
+	$quiet=0;
+	msg("ERROR: ". join(" ",@_));
+	exit(2);
+}
+
+sub find_exe {
+	my($bin) = shift;
+	for my $dir (File::Spec->path) {
+		my $exe = File::Spec->catfile($dir, $bin);
+		return $exe if -x $exe; 
+	}
+	return;
+}
+
+sub runcmd {
+	msg("Running:", @_);
+	system(@_)==0 or err("Could not run command:", @_);
+}
+
+sub num_cpu {
+	if ( $^O =~ m/linux/i ) {
+		my($num) = qx(grep -c ^processor /proc/cpuinfo);
+		return $1 if $num =~ m/^(\d+)/;
+	}
+	elsif ( $^O =~ m/darwin/i ) {
+		my($num) = qx(system_profiler SPHardwareDataType | grep Cores);
+		return $1 if $num =~ /.*Cores: (\d+)/;
+	}
+	return 1;
+}
+
+sub delfile {
+  for my $file (@_) {
+    if ($debug) {
+      msg("In --debug mode, saving temporary file:", $file);
+    }
+    else {
+      msg("Deleting unwanted file:", $file);
+      unlink $file;
+    }
+  }
+}
+
+sub open_file
+{
+    my ($file) = @_;
+    my $fh;
+    my $pid;
+    if ( $file=~/\.gz$/i ) { $pid=open($fh, "gunzip -c $file |") or  err("gunzip -c $file: $!"); }
+    else { $pid=open($fh,'<',$file) or err("$file: $!"); }
+    return ($fh,$pid);
+}
+
+sub is_fasta
+{
+    $SIG{'PIPE'}=sub{};
+    my $file=shift;
+    my ($fh,$pid)= open_file($file);
+    my $head=<$fh>;
+    close $fh;
+    kill 9, $pid; # avoid gunzip broken pipe
+    $SIG{'PIPE'} = 'DEFAULT';
+    ($head =~/^>/)?
+        return 1:
+        return 0;
+}
+
+sub is_fastq
+{
+    $SIG{'PIPE'}=sub{};
+    my $file=shift;
+    my ($fh,$pid)= open_file($file);
+    my $head=<$fh>;
+    close $fh;
+    kill 9, $pid; # avoid gunzip broken pipe
+    
+    $SIG{'PIPE'} = 'DEFAULT';
+    ($head =~/^@/)?
+        return 1:
+        return 0;
+}
+
+sub check_tools{
+	
+	my %tools = (
+		'perl' => {
+			GETVER  => "perl -v | grep 'version'",
+			REGEXP  => qr/\(v(\d+\.\d+)/,
+			MINVER  => "5.16",
+			NEEDED  => 1,
+		},
+		'R' => {
+			GETVER  => "R --version | grep 'version'",
+			REGEXP  => qr/R version\s+(\d+\.\d+\.\d+)/,
+			MINVER  => "3.3.0",
+			NEEDED  => 1,  
+			BIN     => 1,
+		},
+		'samtools' => {
+			GETVER  => "samtools 2>\&1| grep 'Version'",
+			REGEXP  => qr/Version:\s+(\d+\.\d+\.\d+)/,
+			MINVER  => "1.3.0",
+			NEEDED  => 1,
+			BIN     => 1,
+		},
+		'bwa' => {
+			GETVER  => "bwa 2>\&1| grep 'Version'",
+			REGEXP  => qr/Version:\s+(\d+\.\d+\.\d+)/,
+			MINVER  => "0.7.0",
+			NEEDED  => 1,
+			BIN     => 1,
+		},
+		'Parallel::ForkManager' => {
+			GETVER  => "perl -e 'use lib \"$RealBin\/ext\/lib\/perl5\"; use Parallel::ForkManager; print \$Parallel::ForkManager::VERSION;'",
+			REGEXP  => qr/(\d+\.\d+)/,
+			MINVER  => "1.13",
+			NEEDED  => 1,
+			BIN     => 0,
+		},
+		'plotly' => {
+			GETVER  => "Rscript -e 'packageVersion(\"plotly\")' 2>/dev/null",
+			REGEXP  => qr/(\d+\.\d+.\d+)/,
+			MINVER  => "4.5.0",
+			NEEDED  => 0,
+			BIN     => 0,
+		},
+		'webshot' => {
+			GETVER  => "Rscript -e 'packageVersion(\"webshot\")' 2>/dev/null",
+			REGEXP  => qr/(\d+\.\d+.\d+)/,
+			MINVER  => "0.3.2",
+			NEEDED  => 0,
+			BIN     => 0,
+		},
+		'phantomjs' => {
+			GETVER  => "phantomjs -v",
+			REGEXP  => qr/(\d+\.\d+.\d+)/,
+			MINVER  => "2.1.1",
+			NEEDED  => 1,
+			BIN     => 1,
+		},
+		# now just the standard unix tools we need
+		'less'   => { NEEDED=>1, BIN=>1 },
+		'grep'   => { NEEDED=>1, BIN=>1 },
+		'awk'    => { NEEDED=>1, BIN=>1 },
+		'cut'    => { NEEDED=>1, BIN=>1 },
+	);
+	
+	foreach my $toolname (keys %tools){
+		
+		my $tool = $tools{$toolname};
+		my $fp = ($tool->{BIN})?find_exe($toolname):1; 
+	#	print $toolname,"\t",$tool,"\t",$fp,"\n";
+		err("Can't find required '$toolname' in your \$PATH") if !$fp and $tool->{NEEDED};
+	
+		if ($fp){
+			my $msg= "Looking for '$toolname'";
+			$msg .= " - found $fp" if ($fp ne "1");
+			msg("$msg");
+			if(defined $tool->{GETVER}) {
+				my($s) = qx($tool->{GETVER});
+				if (defined $s) {
+					$s =~ $tool->{REGEXP};
+					$tool->{VERSION} = $1 if defined $1;
+					msg("Determined $toolname version is $tool->{VERSION}");
+					if (defined $tool->{MINVER} and $tool->{VERSION} lt $tool->{MINVER}) {
+						err("$EXE needs $toolname $tool->{MINVER} or higher. Please upgrade and try again.");
+					}
+				}
+				else {
+					err("Could not determine version of $toolname - please install version",
+					$tool->{MINVER}, "or higher");
+				}
+			}
+		}
+		
+	}
+}
+
+sub usage 
+{
+	print <<"END";
+$EXE Version $VERSION
+Usage: 
+    $EXE -ref ref.fa --indir input_dir --samples sample_description_file
+Inputs:(requried)
+    --ref            Reference FASTA file
+    --indir          Directory with input Fastq files
+    --samples        Sample descriptions tab-delimited files or xlsx format. (header:#SampleID Files)
+General:
+    --help           This help
+    --version        Print version and exit
+    --quite          No screen output (default OFF) 
+Outputs:
+    --outdir         Output directory
+    --prefix         Filename output prefix [auto] (default '')
+    --force          Force overwriting existing output folder (default OFF)
+Alignment
+    --align_options  BWA mem options in quotation (ex: "-x ont2d" for Oxford Nanopore 2D-reads)
+Computation:
+    --cpus           Number of CPUs to use [0=all] (default '4')
+    --mode           Paired-End (PE) or Single-End (SE) (default PE)
+    --q_cutoff       Quality Calculation cutoff (default 0.8145)
+    --depth_cutoff   Depth of coverage cutoff (default 1000)
+    --len_cutoff     Read length filter (default 100)
+    
+    Expected value     Expected value for respective quality metric 
+    --expectedCoverage  (1)
+    --expectedIdentity  (1)
+    --expectedBaseQ     (37)
+    --expectedMapQ      (60)
+    
+    Weigth options     Weight for respective metric (sum=1) [double]
+    --coverageWeight    (0.25)
+    --identityWeight    (0.25)
+    --baseqWeight       (0.25)
+    --mapqWeight        (0.25)
+    
+END
+    exit;
+  #   --debug          Debug mode: keep all temporary files (default OFF)
+}
