@@ -1,4 +1,4 @@
-#DETECT -- Diagnostic targETEd sequenCing adjudicaTion  
+# DETECT -- Diagnostic targETEd sequenCing adjudicaTion  
 
 Pipeline for assay design evaluation.
 
@@ -281,11 +281,12 @@ ex:
 [live demo](https://edge-bioinfo.shinyapps.io/targetedngs-vis/): The DETECT output visualization R Shiny app on [shinyapps.io](https://www.shinyapps.io).
 
 To host by the Apache, the folowling set up need to be configured in the apache config file
-
+```
 ProxyPass /shiny/websocket  ws://localhost:3838/websocket
 ProxyPassReverse /shiny/websocket  ws://localhost:3838/websocket
 ProxyPass /shiny/ http://localhost:3838/
 ProxyPassReverse /shiny/ http://localhost:3838/
+```
 
 ## Removing DETECT
 
