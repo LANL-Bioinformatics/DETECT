@@ -1,3 +1,3 @@
 #!/bin/bash
-nohup Rscript /opt/DETECT/ShinyApp/app.R /opt/DETECT/ShinyApp/DETECT_02222017.mapping_stats.txt > nohup.log 2>&1 
+nohup Rscript /opt/DETEQT/ShinyApp/app.R /opt/DETEQT/ShinyApp/DETEQT_02222017.mapping_stats.txt > nohup.log 2>&1 
 sleep 10

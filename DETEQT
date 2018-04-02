@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-#    DETECT - Pipeline for assay design evaluation.
+#    DETEQT - Pipeline for assay design evaluation.
 #
 #    Copyright (C) 2016-2018 LANL
 #
@@ -43,7 +43,7 @@ my $VERSION='0.2.0';
 my $AUTHOR='Chienchi Lo <chienchi@lanl.gov>';
 my $OPSYS = $^O;
 my $EXE = $FindBin::RealScript;
-my $URL = 'https://github.com/LANL-Bioinformatics/DETECT';
+my $URL = 'https://github.com/LANL-Bioinformatics/DETEQT';
 
 
 my $quality_calculation_cutoff=0.95**4;
@@ -245,7 +245,7 @@ foreach my $sample_i( 0..$#samples ){
 msg("Generate report plots"); 
 runcmd("mkdir -p  $outdir/reports");
 my $plot_log = "$outdir/reports/log.txt";
-runcmd("Rscript $RealBin/DETECT_plot.R $outdir/stats/$prefix.mapping_stats.txt  $outdir/stats/$prefix.run_stats.txt $abs_outDir/reports/$prefix $quality_calculation_cutoff $depth_cutoff 2>$plot_log");
+runcmd("Rscript $RealBin/DETEQT_plot.R $outdir/stats/$prefix.mapping_stats.txt  $outdir/stats/$prefix.run_stats.txt $abs_outDir/reports/$prefix $quality_calculation_cutoff $depth_cutoff 2>$plot_log");
 
 my $num_of_postive=`grep -i 'Positive' $outdir/stats/$prefix.report.txt | wc -l`;
 my $num_of_postive_sample=`grep -i 'Positive' $outdir/stats/$prefix.report.txt | awk '{print \$1}' | sort | uniq | wc -l`;

@@ -1,4 +1,4 @@
-# DETECT -- Diagnostic targETEd sequenCing adjudicaTion  
+# DETEQT -- Diagnostic targETEd sequenCing adjudicaTion  
 
 Pipeline for assay design evaluation.
 
@@ -11,23 +11,23 @@ Quality Calculation = linear coverage * identity * (uBaseQ / 37) * (uMapQ / 60)
 This calculation is designed to be simple enough to quickly compute in a script and stringent enough to handle most indicators of a false positive, to include reduced base quality from sample bleed, reduced mapping quality from mismapped reads, reduced identity from divergent strain, and any combination that could indicate anything other than a true positive (see attached mapping stats graphs). However, this calculation alone does not constitute as an analytical model because it does not consider abundance. Like with [GOTTCHA](https://github.com/LANL-Bioinformatics/GOTTCHA), reling on read depth as an indicator of abundance, not number or percent of reads. Considering a depth of at least 1E3  and a quality calculation of at least 0.95^4 (0.8145) as a positive (see [example results graph](https://chienchilo.bitbucket.io/targetedNGS/example/reports/targetNGS_02222017_sample_plot.html)). These thresholds are not set in stone. We're looking into some less subjective ways to set them, but for now they seem to be very robust for all of our assays, especially when low diversity amplicon sequencing is expected.
 
 
-## Installing DETECT
-Download the latest version of DETECT from [github](https://github.com/LANL-Bioinformatics/DETECT) or use `git clone` from command line.
+## Installing DETEQT
+Download the latest version of DETEQT from [github](https://github.com/LANL-Bioinformatics/DETEQT) or use `git clone` from command line.
 
 ```
-git clone https://github.com/LANL-Bioinformatics/DETECT.git
+git clone https://github.com/LANL-Bioinformatics/DETEQT.git
 ```
 
-`cd` into the `DETECT` directory
+`cd` into the `DETEQT` directory
 
 ```
-cd DETECT
+cd DETEQT
 ./INSTALL.sh 
 ```
 The `sudo` privileges are not needed for installation. The installation script will pull required dependencies with internet. A log of all installation can be found in `install.log`
 
 ##Dependencies
-DETECT run requires following dependencies which should be in your path. All of the dependencies will be installed by `INSTALL.sh`.
+DETEQT run requires following dependencies which should be in your path. All of the dependencies will be installed by `INSTALL.sh`.
 
 ### Programming/Scripting languages
 - [Perl >=v5.16.3](https://www.perl.org/get.html)
@@ -99,12 +99,12 @@ DETECT run requires following dependencies which should be in your path. All of 
 ### Python package
 - [xlsx2csv (0.7.3)](https://github.com/dilshod/xlsx2csv)
 
-## Running DETECT
+## Running DETEQT
 
 
 ```
 Usage: 
-    DETECT -ref ref.fa --indir input_dir --samples sample_description_file
+    DETEQT -ref ref.fa --indir input_dir --samples sample_description_file
 Inputs:(requried)
     --ref            Reference FASTA file
     --indir          Directory with input Fastq files
@@ -262,7 +262,7 @@ cd test
  Percent_Run            | Prefilter_Reads / sum(Prefilter_Reads)
 
 
-## DETECT R Shiny app 
+## DETEQT R Shiny app 
 
 The app is for interactively visualizing mapping_stats output file.
 
@@ -275,10 +275,10 @@ Rscript ShinyApp/app.R outdir/stats/prefix.mapping_stats.txt Quality_Calculation
         Depth_of_coverage_cutoff: 1000
         port: 3838  (R Shiny Server port)
 ex:
-    Rscript ShinyApp/app.R ShinyApp/DETECT_02222017.mapping_stats.txt
+    Rscript ShinyApp/app.R ShinyApp/DETEQT_02222017.mapping_stats.txt
 ```
 
-[live demo](https://edge-bioinfo.shinyapps.io/targetedngs-vis/): The DETECT output visualization R Shiny app on [shinyapps.io](https://www.shinyapps.io).
+[live demo](https://edge-bioinfo.shinyapps.io/targetedngs-vis/): The DETEQT output visualization R Shiny app on [shinyapps.io](https://www.shinyapps.io).
 
 To host by the Apache, the folowling set up need to be configured in the apache config file
 ```
@@ -288,9 +288,9 @@ ProxyPass /shiny/ http://localhost:3838/
 ProxyPassReverse /shiny/ http://localhost:3838/
 ```
 
-## Removing DETECT
+## Removing DETEQT
 
-For removal, delete (`rm -rf`) `DETECT` folder, which will remove any packages that were downloaded in that folder. 
+For removal, delete (`rm -rf`) `DETEQT` folder, which will remove any packages that were downloaded in that folder. 
 
 # PseudoCode
 ##Shell pipe
@@ -328,7 +328,7 @@ For removal, delete (`rm -rf`) `DETECT` folder, which will remove any packages t
 - Chien-Chi Lo: <chienchi@lanl.gov> - pipeline implementation
 
 ## Citations
-If you use DETECT please cite following papers:
+If you use DETEQT please cite following papers:
 
 - **samtools**: Li H., Handsaker B., Wysoker A., Fennell T., Ruan J., Homer N., Marth G., Abecasis G., Durbin R. and 1000 Genome Project Data Processing Subgroup (2009) The Sequence alignment/map (SAM) format and SAMtools. Bioinformatics, 25, 2078-9. [PMID: 19505943]
 

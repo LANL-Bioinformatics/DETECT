@@ -16,7 +16,7 @@ if (length(args)==0) {
 } 
 
 if ( !file.exists(stats_table_file) ){
-  stats_table_file<-"DETECT_02222017.mapping_stats.txt"
+  stats_table_file<-"DETEQT_02222017.mapping_stats.txt"
 }
 
 if (!exists("port") || is.na(port)){

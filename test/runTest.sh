@@ -24,6 +24,6 @@ then
 	rm -rf $rootdir/TestOutput
 fi
 
-perl $rootdir/../DETECT  --quite --ref $rootdir/targeted_reference.fa --indir $rootdir --samples $rootdir/sample_test.txt --outdir TestOutput --prefix test || true
+perl $rootdir/../DETEQT  --quite --ref $rootdir/targeted_reference.fa --indir $rootdir --samples $rootdir/sample_test.txt --outdir TestOutput --prefix test || true
 
 test_result;

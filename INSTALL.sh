@@ -310,7 +310,7 @@ echo "
 	TARGETEDNGS installed successfully
 ==============================================
 
-	./DETECT  -h
+	./DETEQT  -h
 
 for usage.
 Read the README for more information!

@@ -17,7 +17,7 @@ Depth_of_coverage_cutoff<-args[5]
 
 # check input
 if ( !file.exists(stats_table_file) ){
-  cat( " ./targetedNGS_plot.R  targetedNGS.mapping_stats.txt targetedNGS.run_stats.txt out_prefix Quality_Calculation_cutoff Depth_of_coverage_cutoff\n")
+  cat( " ./DETEQT_plot.R  targetedNGS.mapping_stats.txt targetedNGS.run_stats.txt out_prefix Quality_Calculation_cutoff Depth_of_coverage_cutoff\n")
   quit(save="no")
 }
 
