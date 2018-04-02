@@ -1,4 +1,4 @@
-# DETEQT -- Diagnostic targETEd sequenCing adjudicaTion  
+# DETEQT -- Diagnostic targETEd seQuencing adjudicaTion  
 
 Pipeline for assay design evaluation.
 
