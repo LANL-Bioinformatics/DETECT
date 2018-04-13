@@ -27,6 +27,22 @@ samtools_VER=1.3.1
 plotly_VER=4.5.6
 Parallel_ForkManager_VER=1.19
 phantomjs_VER=2.1.1
+minimap2_VER=2.10
+
+install_minimap2()
+{
+echo "--------------------------------------------------------------------------
+		Installing minimap2 v$minimap2_VER
+--------------------------------------------------------------------------------
+"
+conda install --yes -p $minicondaPATH -c bioconda minimap2==2.10
+echo "
+--------------------------------------------------------------------------------
+		minimap2 v$minimap2_VER installed
+--------------------------------------------------------------------------------
+"
+
+}
 
 install_R()
 {
@@ -257,6 +273,19 @@ then
 	fi
 else
   install_bwa
+fi
+
+if ( checkSystemInstallation minimap2 )
+then
+	minimap2_installed_VER=`minimap2 --version |  perl -nle 'print $1 if m{(\d+\.\d+\.*\d*)}'`;
+	if  ( echo $minimap2_installed_VER $minimap2_VER| awk '{if($1>=$2) exit 0; else exit 1}' )
+	then
+		echo " - found minimap2 $minimap2_installed_VER"
+	else
+		install_minimap2
+	fi
+else
+	install_minimap2
 fi
 
 if ( checkSystemInstallation samtools )

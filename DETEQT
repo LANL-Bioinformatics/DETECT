@@ -39,7 +39,7 @@ $ENV{R_LIBS}=($ENV{R_LIBS})? "$RealBin/ext/lib/R_libs:$ENV{R_LIBS}":"$RealBin/ex
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # global variables
 
-my $VERSION='0.2.0';
+my $VERSION='0.3.0';
 my $AUTHOR='Chienchi Lo <chienchi@lanl.gov>';
 my $OPSYS = $^O;
 my $EXE = $FindBin::RealScript;
@@ -57,6 +57,8 @@ my $align_options="";
 my ($coverageWeight, $identityWeight, $baseqWeight, $mapqWeight) = (0.25, 0.25, 0.25, 0.25);
 my $read_length_cutoff=100;
 my $cpus=4;
+my $aligner='bwa';
+
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # command line options
 my ($outdir,$indir,$sample_desc_file,$ref_file, $prefix,
@@ -80,6 +82,7 @@ GetOptions(
             "baseqWeight=f"    => \$baseqWeight,
             "mapqWeight=f"     => \$mapqWeight,
             "len_cutoff=i"     => \$read_length_cutoff,
+	    "aligner=s"        => \$aligner,
             "align_options=s"   => \$align_options,
             "quite"            => \$quiet,
             "debug"            => \$debug,
@@ -184,7 +187,7 @@ if(! -e "$ref_file.bwt")
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # mapping sample reads
-msg("BWA mapping reads to reference"); 
+msg("$aligner mapping reads to reference"); 
 runcmd("mkdir -p  $outdir/mapping");
 foreach my $sample(keys %{$samples_r}){
 	next if ( -e "$outdir/mapping/$sample.mapping.log" && -s "$outdir/mapping/$sample.bam" );
@@ -192,10 +195,18 @@ foreach my $sample(keys %{$samples_r}){
 	my @files = @{$samples_r->{$sample}->{files}};
 	my $paired_files = join(" ",@files);
 	my $desc = ($samples_r->{$sample}->{Descriptions})?$samples_r->{$sample}->{Descriptions}:"TARGET_SEQUENCING";
-	my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:ILLUMINA";
 	my $other_options = ($mode eq "SE")? "-S -P" : "" ;
 	$other_options .= " $align_options " if ($align_options);
-	runcmd("bwa mem $other_options -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
+	if ($aligner eq 'bwa'){
+		my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:ILLUMINA";
+		runcmd("$aligner mem $other_options -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
+	}elsif ($aligner eq 'minimap2'){	
+		my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:MinION";
+		my $preset = (scalar(@files)>1)? "-x sr": "-x map-ont";
+		$other_options = " $align_options ";
+		runcmd("$aligner $other_options $preset -aL -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
+
+	}
 }
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
@@ -431,6 +442,13 @@ sub check_tools{
 			GETVER  => "samtools 2>\&1| grep 'Version'",
 			REGEXP  => qr/Version:\s+(\d+\.\d+\.*\d*)/,
 			MINVER  => "1.3.0",
+			NEEDED  => 1,
+			BIN     => 1,
+		},
+		 'minimap2' => {
+			GETVER  => "minimap2 --version",
+			REGEXP  => qr/(\d+\.\d+\.*\d*)/,
+			MINVER  => "2.10",
 			NEEDED  => 1,
 			BIN     => 1,
 		},
