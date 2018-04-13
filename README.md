@@ -42,6 +42,7 @@ DETEQT run requires following dependencies which should be in your path. All of 
 
 ### Third party softwares/packages
 - [bwa (v0.7.15-r1140)](http://bio-bwa.sourceforge.net) - reads aligner
+- [minimap2 (v2.10-r761)](https://github.com/lh3/minimap2) - reads aligner
 - [samtools (v1.3.1)](http://www.htslib.org) - process bwa output
 - [phantomjs (2.1.1)](http://phantomjs.org) - convert html to png
 
@@ -118,6 +119,7 @@ Outputs:
     --prefix         Filename output prefix [auto] (default '')
     --force          Force overwriting existing output folder (default OFF)
 Alignment
+    --aligner        bwa or minimap2 (minimap2 is preferred for nanopore reads)
     --align_options  BWA mem options in quotation (ex: "-x ont2d" for Oxford Nanopore 2D-reads)
 Computation:
     --cpus           Number of CPUs to use [0=all] (default '4')
@@ -333,6 +335,8 @@ If you use DETEQT please cite following papers:
 - **samtools**: Li H., Handsaker B., Wysoker A., Fennell T., Ruan J., Homer N., Marth G., Abecasis G., Durbin R. and 1000 Genome Project Data Processing Subgroup (2009) The Sequence alignment/map (SAM) format and SAMtools. Bioinformatics, 25, 2078-9. [PMID: 19505943]
 
 - **bwa**: Li H. and Durbin R. (2009) Fast and accurate short read alignment with Burrows-Wheeler Transform. Bioinformatics, 25:1754-60. [PMID: 19451168]
+
+- **minimap2**: Li, H. (2017). Minimap2: fast pairwise alignment for long nucleotide sequences. arXiv:1708.01492
 
 - **plotly**: Carson Sievert, Chris Parmer, Toby Hocking, Scott Chamberlain, Karthik Ram, Marianne Corvellec and Pedro Despouy (2016). plotly: Create Interactive Web Graphics via 'plotly.js'. R package version 4.5.6. <https://CRAN.R-project.org/package=plotly>
 
