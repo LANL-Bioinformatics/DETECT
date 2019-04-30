@@ -332,6 +332,10 @@ For removal, delete (`rm -rf`) `DETEQT` folder, which will remove any packages t
 ## Citations
 If you use DETEQT please cite following papers:
 
+  **DETEQT**: Conrad TA et al (2019). Diagnostic targETEd seQuencing adjudicaTion (DETEQT): Algorithms for Adjudicating Targeted Infectious Disease Next-Generation Sequencing Panels. J Mol Diagn. 2019 Jan;21(1):99-110. <https://www.ncbi.nlm.nih.gov/pubmed/30268944>
+
+Other citations/tools used by DETEQT:
+ 
 - **samtools**: Li H., Handsaker B., Wysoker A., Fennell T., Ruan J., Homer N., Marth G., Abecasis G., Durbin R. and 1000 Genome Project Data Processing Subgroup (2009) The Sequence alignment/map (SAM) format and SAMtools. Bioinformatics, 25, 2078-9. [PMID: 19505943]
 
 - **bwa**: Li H. and Durbin R. (2009) Fast and accurate short read alignment with Burrows-Wheeler Transform. Bioinformatics, 25:1754-60. [PMID: 19451168]
