@@ -302,6 +302,8 @@ sub parse_description_files {
 			$array[0] =~ s/\W/\_/g;
 			foreach my $i(1..$#array){
 				if ($i == $file_column_index){
+					$array[$i] =~ tr/"//d;
+					$array[$i] =~ s/\s+//g;
                				my @fastq_files;
                				foreach my $file_name (split /,|\s+/,$array[$i]){
 						$file_name =~ tr/"//d;
