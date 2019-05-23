@@ -23,7 +23,7 @@ mkdir -p $minicondaPATH
 R_VER=3.3.2
 bowtie2_VER=2.2.8
 bwa_VER=0.7.15
-samtools_VER=1.3.1
+samtools_VER=1.9
 plotly_VER=4.5.6
 Parallel_ForkManager_VER=1.19
 phantomjs_VER=2.1.1
