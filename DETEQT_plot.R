@@ -110,10 +110,15 @@ ind1<-list(x=-0.5,y=Quality_Calculation_cutoff+0.1,text="IND-Depth",font=list(co
 ind2<-list(x=6.5,y=Quality_Calculation_cutoff-0.1,text="IND-Qual",font=list(color="orange",size=12),xref="x",yref="y",ax=0,ay=0)
 pos<-list(x=6.5,y=Quality_Calculation_cutoff+0.1,text="POS",font=list(color="blue",size=12),xref="x",yref="y",ax=0,ay=0)
 
-sample_plot <- plot_ly(stats_table_with_none0_q,y=~Quality_Calculation,x=~Depth_Mean+0.1,type='scatter',mode='markers',color=~SampleID,marker=marker,hoverinfo = 'text', text = ~paste('Sample: ',SampleID, '</br> Target: ', Target, '</br> Depth: ', Depth_Mean,'</br> Calculation: ', Quality_Calculation)) %>% 
+table_for_plot <- stats_table_with_none0_q
+if (nrow(stats_table_with_none0_q) == 0){
+	table_for_plot <- stats_table
+}
+
+sample_plot <- plot_ly(table_for_plot,y=~Quality_Calculation,x=~Depth_Mean+0.1,type='scatter',mode='markers',color=~SampleID,marker=marker,hoverinfo = 'text', text = ~paste('Sample: ',SampleID, '</br> Target: ', Target, '</br> Depth: ', Depth_Mean,'</br> Calculation: ', Quality_Calculation)) %>% 
   layout(yaxis=y_property,xaxis=x_property,shapes=c(list(H_line),list(V_line)),annotations = c(list(neg),list(ind1),list(ind2),list(pos)))
 
-target_plot <- plot_ly(stats_table_with_none0_q,y=~Quality_Calculation,x=~Depth_Mean+0.1,type='scatter',mode='markers',color=~Target,marker=marker,hoverinfo = 'text', text = ~paste('Sample: ',SampleID, '</br> Target: ', Target, '</br> Depth: ', Depth_Mean,'</br> Calculation: ', Quality_Calculation)) %>% 
+target_plot <- plot_ly(table_for_plot,y=~Quality_Calculation,x=~Depth_Mean+0.1,type='scatter',mode='markers',color=~Target,marker=marker,hoverinfo = 'text', text = ~paste('Sample: ',SampleID, '</br> Target: ', Target, '</br> Depth: ', Depth_Mean,'</br> Calculation: ', Quality_Calculation)) %>% 
   layout(yaxis=y_property,xaxis=x_property,shapes=c(list(H_line),list(V_line)),annotations = c(list(neg),list(ind1),list(ind2),list(pos)))
 
 # output as html files
