@@ -39,7 +39,7 @@ $ENV{R_LIBS}=($ENV{R_LIBS})? "$RealBin/ext/lib/R_libs:$ENV{R_LIBS}":"$RealBin/ex
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # global variables
 
-my $VERSION='0.3.0';
+my $VERSION='0.3.1';
 my $AUTHOR='Chienchi Lo <chienchi@lanl.gov>';
 my $OPSYS = $^O;
 my $EXE = $FindBin::RealScript;
