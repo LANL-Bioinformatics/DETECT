@@ -195,6 +195,10 @@ checkPerlModule()
 }
 
 
+versionStr() { 
+  echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; 
+}
+
 ####### MAIN #######
 
 
@@ -240,7 +244,7 @@ Rscript --no-init-file -e "if('DT' %in% rownames(installed.packages()) == FALSE)
 if ( checkSystemInstallation phantomjs )
 then
 	phantomjs_installed_VER=`phantomjs -v`;
-	if  ( echo $phantomjs_installed_VER $phantomjs_VER| awk '{if($1>=$2) exit 0; else exit 1}' )
+	if [ $(versionStr $phantomjs_installed_VER) -ge $(versionStr $phantomjs_VER) ]
 	then
 		echo " - found phantomjs $phantomjs_installed_VER"
 	else
@@ -266,8 +270,8 @@ fi
 
 if ( checkSystemInstallation bwa )
 then
-	bwa_installed_VER=`bwa 2>&1| grep 'Version'  | perl -nle 'print $& if m{Version: \d+\.\d+\.\d+}'`;
-	if  ( echo $bwa_installed_VER $bwa_VER | awk '{if($2>=$3) exit 0; else exit 1}' )
+	bwa_installed_VER=`bwa 2>&1| grep 'Version'  | perl -nle 'print $1 if m{Version: (\d+\.\d+\.\d+)}'`;
+	if [ $(versionStr $bwa_installed_VER) -ge $(versionStr $bwa_VER) ]
 	then
 		echo " - found BWA $bwa_installed_VER"
 	else
@@ -280,7 +284,7 @@ fi
 if ( checkSystemInstallation minimap2 )
 then
 	minimap2_installed_VER=`minimap2 --version |  perl -nle 'print $1 if m{(\d+\.\d+\.*\d*)}'`;
-	if  ( echo $minimap2_installed_VER $minimap2_VER| awk '{if($1>=$2) exit 0; else exit 1}' )
+	if [ $(versionStr $minimap2_installed_VER) -ge $(versionStr $minimap2_VER) ]
 	then
 		echo " - found minimap2 $minimap2_installed_VER"
 	else
@@ -292,13 +296,12 @@ fi
 
 if ( checkSystemInstallation samtools )
 then
-	samtools_installed_VER=`samtools 2>&1| grep 'Version'|perl -nle 'print $& if m{Version: \d+\.\d+.\d+}'`;
+	samtools_installed_VER=`samtools 2>&1| grep 'Version'|perl -nle 'print $1 if m{Version: (\d+\.\d+.\d+)}'`;
 	if [ -z "$samtools_installed_VER" ]
-	then 
-		samtools_installed_VER=`samtools 2>&1| grep 'Version'|perl -nle 'print $& if m{Version: \d+\.\d+}'`; 
+	then
+		samtools_installed_VER=`samtools 2>&1| grep 'Version'|perl -nle 'print $1 if m{Version: (\d+\.\d+)}'`;
 	fi
-	
-	if  ( echo $samtools_installed_VER $samtools_VER| awk '{if($2>=$3) exit 0; else exit 1}' )
+	if [ $(versionStr $samtools_installed_VER) -ge $(versionStr "1.9") ]
 	then
 		echo " - found samtools $samtools_installed_VER"
 	else
