@@ -206,11 +206,12 @@ if ( checkSystemInstallation conda )
 then
 	conda_installed_VER=`conda --version 2>&1|perl -nle 'print $& if m{(\d+\.\d+\.\d+)}'`;
   	echo " - found conda $conda_installed_VER"
-        echo "conda create --prefix $minicondaPATH -y"
-        conda create --prefix $minicondaPATH -y
 else
  	install_miniconda
 fi
+
+echo "conda create --prefix $minicondaPATH -y"
+conda create --prefix $minicondaPATH -y
 
 
 
