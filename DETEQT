@@ -26,6 +26,7 @@ use Getopt::Long;
 use Cwd;
 use FindBin qw($RealScript $RealBin);
 use lib "$RealBin/ext/lib/perl5";
+use version;
 #use Data::Dumper;
 use Parallel::ForkManager;
 
@@ -39,7 +40,7 @@ $ENV{R_LIBS}=($ENV{R_LIBS})? "$RealBin/ext/lib/R_libs:$ENV{R_LIBS}":"$RealBin/ex
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 
 # global variables
 
-my $VERSION='0.3.1';
+my $VERSION='0.3.2';
 my $AUTHOR='Chienchi Lo <chienchi@lanl.gov>';
 my $OPSYS = $^O;
 my $EXE = $FindBin::RealScript;
@@ -198,10 +199,10 @@ foreach my $sample(keys %{$samples_r}){
 	my $other_options = ($mode eq "SE")? "-S -P" : "" ;
 	$other_options .= " $align_options " if ($align_options);
 	if ($aligner eq 'bwa'){
-		my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:ILLUMINA";
+		my $read_group = "\@RG\tID:$sample\tSM:$sample\tDS:$desc\tPL:ILLUMINA";
 		runcmd("$aligner mem $other_options -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
 	}elsif ($aligner eq 'minimap2'){	
-		my $read_group = "\@RG:\tID:$sample\tSM:$sample\tDS:$desc\tPL:MinION";
+		my $read_group = "\@RG\tID:$sample\tSM:$sample\tDS:$desc\tPL:MinION";
 		my $preset = (scalar(@files)>1)? "-x sr": "-x map-ont";
 		$other_options = " $align_options ";
 		runcmd("$aligner $other_options $preset -aL -t $cpus -R '$read_group' $ref_file $paired_files 2>$mapping_log | samtools sort -@ $cpus > $outdir/mapping/$sample.bam ");
@@ -513,7 +514,9 @@ sub check_tools{
 					$s =~ $tool->{REGEXP};
 					$tool->{VERSION} = $1 if defined $1;
 					msg("Determined $toolname version is $tool->{VERSION}");
-					if (defined $tool->{MINVER} and $tool->{VERSION} lt $tool->{MINVER}) {
+					my $ver = $tool->{VERSION};
+					my $min = $tool->{MINVER};
+					if (defined $tool->{MINVER} and version->declare($ver) < version->declare($min)) {
 						err("$EXE needs $toolname $tool->{MINVER} or higher. Please upgrade and try again.");
 					}
 				}
